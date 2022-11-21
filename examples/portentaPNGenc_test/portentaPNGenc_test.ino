@@ -1,6 +1,7 @@
 //
 // PNG encoder test sketch
 // written by Larry Bank
+// Adapted for the Portenta by Jeremy Ellis Twitter @rocksetta
 //
 // Creates a 128x128x8-bpp image 'on-the-fly' and
 // compresses it as a PNG file. The image is a green square with an X in the middle
@@ -10,42 +11,64 @@
 // performance or can write the PNG file to a micro-SD card
 // Disable the macro below (WRITE_TO_SD) to use only memory
 //
+//  The circuit:
+//   - Portenta H7 + Vision Shield
+//     or
+//   - Portenta H7 + Portenta Breakout
 
 #include <PNGenc.h>
-PNG png; // static instance of the PNG encoder lass
+PNG png; // static instance of the PNG encoder class
 
 // Add comment bars (//) in front of this macro to send the output to RAM only
 #define WRITE_TO_SD
 
 #ifdef WRITE_TO_SD
-#include <SD.h>
+
+#include "SDMMCBlockDevice.h"
+#include "FATFileSystem.h"
+
+SDMMCBlockDevice block_device;
+mbed::FATFileSystem fs("fs");
 
 // Functions to access a file on the SD card
 File myfile;
+//FILE *myFile;  // note slightly different file handle
+char buffer[40];   // must be long enough for all data points with commas: 56,34,23,56
 
-void * myOpen(const char *filename) {
-  Serial.printf("Attempting to open %s\n", filename);
+
+
+void *myOpen(const char *filename) {
+ // Serial.printf("Attempting to open %s\n", filename);
+  Serial.print("Attempting to open ");
+  Serial.println(filename);
   // IMPORTANT!!! - don't use FILE_WRITE because it includes O_APPEND
   // this will cause the file to be written incorrectly
-  myfile = SD.open(filename, O_READ| O_WRITE | O_CREAT);
+ // myfile = SD.open(filename, O_READ| O_WRITE | O_CREAT);
+  myfile = fopen(filename, "a");  
   return &myfile;
 }
 void myClose(PNGFILE *handle) {
   File *f = (File *)handle->fHandle;
-  f->close();
+  //f->close();
+  fclose();
 }
+int32_t myWrite(PNGFILE *handle, uint8_t *buffer, int32_t length) {
+  File *f = (File *)handle->fHandle;
+ // return f->write(buffer, length);
+  return fprintf(buffer, length);
+}
+
+/*  // not needed yet
 int32_t myRead(PNGFILE *handle, uint8_t *buffer, int32_t length) {
   File *f = (File *)handle->fHandle;
   return f->read(buffer, length);
 }
-int32_t myWrite(PNGFILE *handle, uint8_t *buffer, int32_t length) {
-  File *f = (File *)handle->fHandle;
-  return f->write(buffer, length);
-}
+
 int32_t mySeek(PNGFILE *handle, int32_t position) {
   File *f = (File *)handle->fHandle;
   return f->seek(position);
 }
+*/
 #endif // WRITE_TO_SD
 
 #define WIDTH 128
@@ -98,7 +121,10 @@ long l;
             } // for y
             iDataSize = png.close();
             l = micros() - l;
-            Serial.printf("%d bytes of data written to file in %d us\n", iDataSize, (int)l);
+            Serial.printf(iDataSize);
+            Serial.printf("bytes of data written to file in ");
+            Serial.printf((int)l);
+            Serial.printf("us\n");
         }
   } else {
     Serial.println("Failed to create the file on the SD card!");
